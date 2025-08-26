@@ -1,8 +1,12 @@
 package com.github.stabrinai.afkplugin.managers;
 
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.wrapper.play.server.*;
 import com.github.stabrinai.afkplugin.settings.Settings;
+import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import java.util.HashMap;
@@ -52,6 +56,20 @@ public class PlayerManager implements com.github.stabrinai.afkplugin.api.PlayerM
         }
 
         if (settings.isAfkGodMode()) player.setInvulnerable(false);
+
+        // Sync players that this player is currently tracking
+        player.getTrackedBy().forEach(tracking -> syncEntityLocation(player, tracking));
+    }
+
+    private void syncEntityLocation(Player targetPlayer, Entity entity)
+    {
+        com.github.retrooper.packetevents.protocol.world.Location packetEventsLocation = SpigotConversionUtil.fromBukkitLocation(entity.getLocation());
+        var packetTeleport = new WrapperPlayServerEntityTeleport(entity.getEntityId(), packetEventsLocation, false);
+
+        // Teleport player, and fix their head look since the teleport packet doesn't set the head rotation
+        var playerManager = PacketEvents.getAPI().getPlayerManager();
+        playerManager.sendPacket(targetPlayer, packetTeleport);
+        playerManager.sendPacket(targetPlayer, new WrapperPlayServerEntityHeadLook(entity.getEntityId(), entity.getYaw()));
     }
 
     @Override
